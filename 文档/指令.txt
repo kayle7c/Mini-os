@@ -4,5 +4,5 @@ sudo dd if=/home/maliang/tiny-os/boot/mbr.bin of=/home/maliang/bochs/hd60M.img b
 sudo dd if=/home/maliang/tiny-os/boot/loader.bin of=/home/maliang/bochs/hd60M.img bs=512 count=4 seek=2 conv=notrunc
 sudo dd if=/home/maliang/tiny-os/kernel/kernel.bin of=/home/maliang/bochs/hd60M.img bs=512 count=200 seek=9 conv=notrunc
 gcc -I lib/kernel/ -c -o kernel/main.o kernel/main.c
-ld kernel/main.o -Ttext 0xc0001500 -e main -o kernel/kernel.bin
+ld -m elf_i386 -Ttext 0xc0001500 -e main -o build/kernel.bin build/init.o build/interrupt.o build/kernel.o build/main.o build/print.o
 sudo bin/bochs -f bochsrc.disk
