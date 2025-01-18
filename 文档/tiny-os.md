@@ -2,7 +2,7 @@
 
 ## bios
 
-计算机的启动：系统上电加载cs：ip 寄存器被强制初始化为 0xF000：0xFFF0 ->rom上的固化bios->硬件自检->加载到物理地址 0x7c00   进入mbr->mbr把磁盘扇区2的loader读取到内存中去，跳转到loader->
+计算机的启动：系统上电加载cs：ip 寄存器被强制初始化为 0xF000：0xFFF0 ->rom上的固化bios->硬件自检->加载到物理地址 0x7c00   进入mbr->mbr把磁盘扇区2的loader读取到内存中去，跳转到loader->loader将内核复制到内存->内核
 
 bios的内存布局
 
