@@ -76,9 +76,9 @@ static void general_intr_handler(uint8_t vec_nr) {
    if (vec_nr == 0x27 || vec_nr == 0x2f) {	// 0x2f是从片8259A上的最后一个irq引脚，保留
       return;		//IRQ7和IRQ15会产生伪中断(spurious interrupt),无须处理。
    }
-   put_str("int vector: 0x");
-   put_int(vec_nr);
-   put_char('\n');
+  // put_str("int vector: 0x");
+   //put_int(vec_nr);
+   //put_char('\n');
 }
 
 /* 完成一般中断处理函数注册及异常名称注册 */
