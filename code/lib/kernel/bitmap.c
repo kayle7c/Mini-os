@@ -14,7 +14,7 @@ void bitmap_init(struct bitmap* btmp)
 //检查位图某一位
 bool bitmap_scan_test(struct bitmap* btmp, uint32_t bit_idx)
 {
-    return btmp->bits[bit_idx/8] & (1<<bit_idx%8)
+    return btmp->bits[bit_idx/8] & (1<<bit_idx%8);
 }
 
 //在位图中连续申请n位
@@ -27,7 +27,7 @@ int bitmap_scan(struct bitmap* btmp, uint32_t cnt)
     }
 
     ASSERT(idx_byte < btmp->btmp_bytes_len);
-    if(idx_byte == btmp_bytes_len)   //位图已满
+    if(idx_byte == btmp->btmp_bytes_len)   //位图已满
         return -1;
 
     int idx_bit=0;
@@ -72,10 +72,10 @@ void bitmap_set(struct bitmap* btmp, uint32_t bit_idx, int8_t value)
     ASSERT((value==0) || (value==1));
     if(value)
     {
-        bitmap[bit_idx/8] |= (1<<bit_idx%8)
+        btmp->bits[bit_idx/8] |= (1<<bit_idx%8);
     }
     else
     {
-        bitmap[bit_idx/8] &= ~(1<<bit_idx%8)
+        btmp->bits[bit_idx/8] &= ~(1<<bit_idx%8);
     }
 }

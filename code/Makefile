@@ -9,7 +9,8 @@ LDFLAGS = -m elf_i386 -Ttext $(ENTRY_POINT) -e main -Map $(BUILD_DIR)/kernel.map
 ASFLAGS = -f elf
 OBJS = $(BUILD_DIR)/main.o $(BUILD_DIR)/init.o $(BUILD_DIR)/interrupt.o \
       $(BUILD_DIR)/timer.o $(BUILD_DIR)/kernel.o $(BUILD_DIR)/print.o \
-      $(BUILD_DIR)/debug.o 
+      $(BUILD_DIR)/debug.o $(BUILD_DIR)/memory.o $(BUILD_DIR)/bitmap.o \
+      $(BUILD_DIR)/string.o 
 
 ##c代码编译##
 $(BUILD_DIR)/main.o: kernel/main.c lib/kernel/print.h \
@@ -30,6 +31,20 @@ $(BUILD_DIR)/timer.o: device/timer.c device/timer.h lib/stdint.h\
 
 $(BUILD_DIR)/debug.o: kernel/debug.c kernel/debug.h \
         lib/kernel/print.h lib/stdint.h kernel/interrupt.h
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/string.o: lib/string.c lib/string.h lib/stdint.h kernel/global.h \
+	lib/stdint.h kernel/debug.h
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/bitmap.o: lib/kernel/bitmap.c lib/kernel/bitmap.h \
+    	kernel/global.h lib/stdint.h lib/string.h lib/stdint.h \
+     	lib/kernel/print.h kernel/interrupt.h kernel/debug.h
+	$(CC) $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/memory.o: kernel/memory.c kernel/memory.h lib/stdint.h lib/kernel/bitmap.h \
+   	kernel/global.h kernel/global.h kernel/debug.h lib/kernel/print.h \
+	lib/kernel/io.h kernel/interrupt.h lib/string.h lib/stdint.h
 	$(CC) $(CFLAGS) $< -o $@
 ##编译汇编文件##
 $(BUILD_DIR)/kernel.o:kernel/kernel.S
