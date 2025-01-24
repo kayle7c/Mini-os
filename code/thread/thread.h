@@ -88,10 +88,12 @@ struct task_struct {
    struct list_elem all_list_tag;
 
    uint32_t* pgdir;              // 进程自己页表的虚拟地址
-   uint32_t stack_magic;	 // 用这串数字做栈的边界标记,用于检测栈的溢出
 };
 
 void thread_create(struct task_struct* pthread, thread_func function, void* func_arg);
 void init_thread(struct task_struct* pthread, char* name, int prio);
 struct task_struct* thread_start(char* name, int prio, thread_func function, void* func_arg);
+struct task_struct* running_thread(void);
+void schedule(void);
+void thread_init(void);
 #endif
