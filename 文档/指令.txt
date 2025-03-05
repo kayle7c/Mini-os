@@ -1,0 +1,9 @@
+nasm -I include/ -o mbr.bin mbr.S
+nasm -I include/ -o loader.bin loader.S
+nasm -f elf -o build/print.o lib/kernel/print.S
+sudo dd if=/home/maliang/tiny-os/boot/mbr.bin of=/home/maliang/bochs/hd60M.img bs=512 count=1 conv=notrunc
+sudo dd if=/home/maliang/tiny-os/boot/loader.bin of=/home/maliang/bochs/hd60M.img bs=512 count=4 seek=2 conv=notrunc
+sudo dd if=/home/maliang/tiny-os/build/kernel.bin of=/home/maliang/bochs/hd60M.img bs=512 count=200 seek=9 conv=notrunc
+gcc -m32 -I lib/kernel/ -m32 -I lib/ -m32 -I kernel/ -c -fno-builtin -o build/main.o kernel/main.c
+ld -m elf_i386 -Ttext 0xc0001500 -e main -o build/kernel.bin build/init.o build/interrupt.o build/kernel.o build/main.o build/print.o build/timer.o
+sudo bin/bochs -f bochsrc.disk
