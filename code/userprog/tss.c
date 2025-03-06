@@ -36,7 +36,7 @@ struct tss {
 }; 
 static struct tss tss;
 
-/* 更新tss中esp0字段的值为pthread的0级栈 */
+/* 更新tss中esp0字段的值为pthread的0级线 */
 void update_tss_esp(struct task_struct* pthread) {
    tss.esp0 = (uint32_t*)((uint32_t)pthread + PG_SIZE);
 }
@@ -77,3 +77,4 @@ void tss_init() {
    asm volatile ("ltr %w0" : : "r" (SELECTOR_TSS));
    put_str("tss_init and ltr done\n");
 }
+

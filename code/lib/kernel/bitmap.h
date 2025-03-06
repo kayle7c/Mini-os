@@ -1,11 +1,11 @@
 #ifndef __LIB_KERNEL_BITMAP_H
 #define __LIB_KERNEL_BITMAP_H
 #include "global.h"
-
-struct bitmap
-{
-    uint32_t btmp_bytes_len;
-    uint8_t* bits; //位图的指针
+#define BITMAP_MASK 1
+struct bitmap {
+   uint32_t btmp_bytes_len;
+/* 在遍历位图时,整体上以字节为单位,细节上是以位为单位,所以此处位图的指针必须是单字节 */
+   uint8_t* bits;
 };
 
 void bitmap_init(struct bitmap* btmp);

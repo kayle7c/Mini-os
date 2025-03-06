@@ -14,7 +14,7 @@
 #define READ_WRITE_LATCH   3
 #define PIT_CONTROL_PORT   0x43
 
-uint32_t ticks; // ticks 是内核自中断开启以来总共的嘀嗒数
+uint32_t ticks;          // ticks是内核自中断开启以来总共的嘀嗒数
 
 /* 把操作的计数器counter_no、读写锁属性rwl、计数器模式counter_mode写入模式控制寄存器并赋予初始值counter_value */
 static void frequency_set(uint8_t counter_port, \
@@ -30,23 +30,20 @@ static void frequency_set(uint8_t counter_port, \
    outb(counter_port, (uint8_t)counter_value >> 8);
 }
 
-static void intr_timer_handler(void)
-{
+/* 时钟的中断处理函数 */
+static void intr_timer_handler(void) {
    struct task_struct* cur_thread = running_thread();
-   ASSERT(cur_thread->stack_magic == 0x12345678); // 检查栈是否溢出
 
-   cur_thread->elapsed_ticks++;// 记录此线程占用的 cpu 时间
-   ticks++;
+   ASSERT(cur_thread->stack_magic == 0x19870916);         // 检查栈是否溢出
 
-   if(cur_thread->ticks == 0)//判断当时线程的时间片是否用完
-   {
-      schedule();//用完就调度到下一个线程
+   cur_thread->elapsed_ticks++;	  // 记录此线程占用的cpu时间嘀
+   ticks++;	  //从内核第一次处理时间中断后开始至今的滴哒数,内核态和用户态总共的嘀哒数
+
+   if (cur_thread->ticks == 0) {	  // 若进程时间片用完就开始调度新的进程上cpu
+      schedule(); 
+   } else {				  // 将当前进程的时间片-1
+      cur_thread->ticks--;
    }
-   else
-   {
-      cur_thread->ticks--;//没用完就让时间片减1
-   }
-
 }
 
 /* 初始化PIT8253 */

@@ -1,84 +1,126 @@
-
+;Ö÷Òýµ¼³ÌÐò 
+;------------------------------------------------------------
 %include "boot.inc"
-SECTION MBR vstart=0x7c00
-;åˆå§‹åŒ–
-mov ax,cs;
-mov ds,ax;
-mov es,ax;
-mov ss,ax;
-mov sp,0x7c00
-mov ax,0xb800
-mov gs,ax;
-;å¯åŠ¨æ˜¾ç¤º
-;è¾“å…¥ï¼š
-;AH åŠŸèƒ½å·= 0x06
-;AL = ä¸Šå·çš„è¡Œæ•°(å¦‚æžœä¸º0,è¡¨ç¤ºå…¨éƒ¨)
-;BH = ä¸Šå·è¡Œå±žæ€§
-;(CL,CH) = çª—å£å·¦ä¸Šè§’çš„(X,Y)ä½ç½®
-;(DL,DH) = çª—å£å³ä¸‹è§’çš„(X,Y)ä½ç½®
-mov ax,0600h
-mov bx,0700h
-mov cx,0
-mov dx,184fh
-int 10h;è°ƒç”¨ä¸­æ–­å·
-mov byte [gs:0x00],'l'
-mov byte [gs:0x01],0xA4;è®¾ç½®æ˜¾ç¤ºå±žæ€§
-mov byte [gs:0x02],'m'
-mov byte [gs:0x03],0xA4
-mov byte [gs:0x04],'b'
-mov byte [gs:0x05],0xA4
-mov byte [gs:0x06],'r'
-mov byte [gs:0x07],0xA4
-;è¯»å–ç£ç›˜
-mov eax,LOADER_START_SECTOR;å°†ç£ç›˜çš„èµ·å§‹åœ°å€ä¼ å…¥ä½œä¸ºå‚æ•°
-mov bx,LOADER_BASE_ADDR;å°†åŠ è½½çš„ç›®çš„åœ°å€ä½œä¸ºå‚æ•°ä¼ å…¥
-mov cx,4;å°†è¦è¯»å–çš„æ€»çš„æ‰‡åŒºæ•°å¡«å…¥
-call read_disk
+SECTION MBR vstart=0x7c00         
+   mov ax,cs      
+   mov ds,ax
+   mov es,ax
+   mov ss,ax
+   mov fs,ax
+   mov sp,0x7c00
+   mov ax,0xb800
+   mov gs,ax
 
-;è·³è½¬æ‰§è¡Œ
-jmp LOADER_BASE_ADDR + 0x300;
+; ÇåÆÁ
+;ÀûÓÃ0x06ºÅ¹¦ÄÜ£¬ÉÏ¾íÈ«²¿ÐÐ£¬Ôò¿ÉÇåÆÁ¡£
+; -----------------------------------------------------------
+;INT 0x10   ¹¦ÄÜºÅ:0x06	   ¹¦ÄÜÃèÊö:ÉÏ¾í´°¿Ú
+;------------------------------------------------------
+;ÊäÈë£º
+;AH ¹¦ÄÜºÅ= 0x06
+;AL = ÉÏ¾íµÄÐÐÊý(Èç¹ûÎª0,±íÊ¾È«²¿)
+;BH = ÉÏ¾íÐÐÊôÐÔ
+;(CL,CH) = ´°¿Ú×óÉÏ½ÇµÄ(X,Y)Î»ÖÃ
+;(DL,DH) = ´°¿ÚÓÒÏÂ½ÇµÄ(X,Y)Î»ÖÃ
+;ÎÞ·µ»ØÖµ£º
+   mov     ax, 0600h
+   mov     bx, 0700h
+   mov     cx, 0                   ; ×óÉÏ½Ç: (0, 0)
+   mov     dx, 184fh		   ; ÓÒÏÂ½Ç: (80,25),
+				   ; ÒòÎªVGAÎÄ±¾Ä£Ê½ÖÐ£¬Ò»ÐÐÖ»ÄÜÈÝÄÉ80¸ö×Ö·û,¹²25ÐÐ¡£
+				   ; ÏÂ±ê´Ó0¿ªÊ¼£¬ËùÒÔ0x18=24,0x4f=79
+   int     10h                     ; int 10h
 
-read_disk:
-mov esi,eax
-mov di,cx
-mov dx,0x1f2;
-mov al,cl;è¦è¯»å–çš„æ‰‡åŒºæ•°
-out dx,al
-;å°†ç‰©ç†ç£ç›˜èµ·å§‹çš„28ä½ç½®å†™å…¥ç«¯å£
-mov eax,esi;æ¢å¤eax
-mov dx,0x1f3;0x1f3
-out dx,al
-mov cl,8
-mov dx,0x1f4;0x1f4
-shr eax,cl
-out dx,al
-inc dx;0x1f5
-shr eax,cl
-out dx,al
-inc dx;0x1f6
-shr eax,cl
-and al,0x0f;å°†æœ€ä½Žå››ä½ä¿ç•™
-or al,0xe0;è®¾ç½®labæ¨¡å¼ï¼Œç£ç›˜åˆ†chsä¸Žlabä¸¤ç§æ¨¡å¼
-out dx,al
-inc dx;0x1f7
-mov al,0x20;å†™å…¥è¯»æ¨¡å¼
-out dx,al
-.wait:
-    in al,dx;ä»Žç«¯å£è¯»å‡ºç›®å‰çš„çŠ¶æ€
-    and al,0x88
-    cmp al,0x08
-    jnz .wait;å¦‚æžœæ²¡å‡†å¤‡å¥½ï¼Œå°±å¾ªçŽ¯ç­‰å¾…
-mov ax,di
-mov dx,256
-mul dx
-mov cx,ax
-mov dx,0x1f0
-.read:
-    in ax,dx
-    mov [bx],ax
-    add bx,2
-    loop .read
-ret
-times 510-($-$$) db 0
-db 0x55,0xaa
-;è·³è½¬æ‰§è¡Œ
+   ; Êä³ö×Ö·û´®:MBR
+   mov byte [gs:0x00],'1'
+   mov byte [gs:0x01],0xA4
+
+   mov byte [gs:0x02],' '
+   mov byte [gs:0x03],0xA4
+
+   mov byte [gs:0x04],'M'
+   mov byte [gs:0x05],0xA4	   ;A±íÊ¾ÂÌÉ«±³¾°ÉÁË¸£¬4±íÊ¾Ç°¾°É«ÎªºìÉ«
+
+   mov byte [gs:0x06],'B'
+   mov byte [gs:0x07],0xA4
+
+   mov byte [gs:0x08],'R'
+   mov byte [gs:0x09],0xA4
+	 
+   mov eax,LOADER_START_SECTOR	 ; ÆðÊ¼ÉÈÇølbaµØÖ·
+   mov bx,LOADER_BASE_ADDR       ; Ð´ÈëµÄµØÖ·
+   mov cx,4			 ; ´ý¶ÁÈëµÄÉÈÇøÊý
+   call rd_disk_m_16		 ; ÒÔÏÂ¶ÁÈ¡³ÌÐòµÄÆðÊ¼²¿·Ö£¨Ò»¸öÉÈÇø£©
+  
+   jmp LOADER_BASE_ADDR + 0x300
+       
+;-------------------------------------------------------------------------------
+;¹¦ÄÜ:¶ÁÈ¡Ó²ÅÌn¸öÉÈÇø
+rd_disk_m_16:	   
+;-------------------------------------------------------------------------------
+				       ; eax=LBAÉÈÇøºÅ
+				       ; ebx=½«Êý¾ÝÐ´ÈëµÄÄÚ´æµØÖ·
+				       ; ecx=¶ÁÈëµÄÉÈÇøÊý
+      mov esi,eax	  ;±¸·Ýeax
+      mov di,cx		  ;±¸·Ýcx
+;¶ÁÐ´Ó²ÅÌ:
+;µÚ1²½£ºÉèÖÃÒª¶ÁÈ¡µÄÉÈÇøÊý
+      mov dx,0x1f2
+      mov al,cl
+      out dx,al            ;¶ÁÈ¡µÄÉÈÇøÊý
+
+      mov eax,esi	   ;»Ö¸´ax
+
+;µÚ2²½£º½«LBAµØÖ·´æÈë0x1f3 ~ 0x1f6
+
+      ;LBAµØÖ·7~0Î»Ð´Èë¶Ë¿Ú0x1f3
+      mov dx,0x1f3                       
+      out dx,al                          
+
+      ;LBAµØÖ·15~8Î»Ð´Èë¶Ë¿Ú0x1f4
+      mov cl,8
+      shr eax,cl
+      mov dx,0x1f4
+      out dx,al
+
+      ;LBAµØÖ·23~16Î»Ð´Èë¶Ë¿Ú0x1f5
+      shr eax,cl
+      mov dx,0x1f5
+      out dx,al
+
+      shr eax,cl
+      and al,0x0f	   ;lbaµÚ24~27Î»
+      or al,0xe0	   ; ÉèÖÃ7¡«4Î»Îª1110,±íÊ¾lbaÄ£Ê½
+      mov dx,0x1f6
+      out dx,al
+
+;µÚ3²½£ºÏò0x1f7¶Ë¿ÚÐ´Èë¶ÁÃüÁî£¬0x20 
+      mov dx,0x1f7
+      mov al,0x20                        
+      out dx,al
+
+;µÚ4²½£º¼ì²âÓ²ÅÌ×´Ì¬
+  .not_ready:
+      ;Í¬Ò»¶Ë¿Ú£¬Ð´Ê±±íÊ¾Ð´ÈëÃüÁî×Ö£¬¶ÁÊ±±íÊ¾¶ÁÈëÓ²ÅÌ×´Ì¬
+      nop
+      in al,dx
+      and al,0x88	   ;µÚ4Î»Îª1±íÊ¾Ó²ÅÌ¿ØÖÆÆ÷ÒÑ×¼±¸ºÃÊý¾Ý´«Êä£¬µÚ7Î»Îª1±íÊ¾Ó²ÅÌÃ¦
+      cmp al,0x08
+      jnz .not_ready	   ;ÈôÎ´×¼±¸ºÃ£¬¼ÌÐøµÈ¡£
+
+;µÚ5²½£º´Ó0x1f0¶Ë¿Ú¶ÁÊý¾Ý
+      mov ax, di
+      mov dx, 256
+      mul dx
+      mov cx, ax	   ; diÎªÒª¶ÁÈ¡µÄÉÈÇøÊý£¬Ò»¸öÉÈÇøÓÐ512×Ö½Ú£¬Ã¿´Î¶ÁÈëÒ»¸ö×Ö£¬
+			   ; ¹²Ðèdi*512/2´Î£¬ËùÒÔdi*256
+      mov dx, 0x1f0
+  .go_on_read:
+      in ax,dx
+      mov [bx],ax
+      add bx,2		  
+      loop .go_on_read
+      ret
+
+   times 510-($-$$) db 0
+   db 0x55,0xaa

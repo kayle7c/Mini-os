@@ -79,3 +79,4 @@ void lock_release(struct lock* plock) {
    plock->holder_repeat_nr = 0;
    sema_up(&plock->semaphore);	   // 信号量的V操作,也是原子操作
 }
+

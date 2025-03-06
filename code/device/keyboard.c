@@ -35,7 +35,7 @@
 #define ctrl_r_break 	0xe09d
 #define caps_lock_make 	0x3a
 
-struct ioqueue kbd_buf;
+struct ioqueue kbd_buf;	   // 定义键盘缓冲区
 
 /* 定义以下变量记录相应键是否按下的状态,
  * ext_scancode用于记录makecode是否以0xe0开头 */
@@ -188,8 +188,8 @@ static void intr_keyboard_handler(void) {
 
       uint8_t index = (scancode &= 0x00ff);  // 将扫描码的高字节置0,主要是针对高字节是e0的扫描码.
       char cur_char = keymap[index][shift];  // 在数组中找到对应的字符
-   
- /* 如果cur_char不为0,也就是ascii码为除'\0'外的字符就加入键盘缓冲区中 */
+
+   /* 如果cur_char不为0,也就是ascii码为除'\0'外的字符就加入键盘缓冲区中 */
       if (cur_char) {
 
      /*****************  快捷键ctrl+l和ctrl+u的处理 *********************
@@ -234,3 +234,4 @@ void keyboard_init() {
    register_handler(0x21, intr_keyboard_handler);
    put_str("keyboard init done\n");
 }
+
