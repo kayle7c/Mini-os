@@ -14,6 +14,8 @@
 #define READ_WRITE_LATCH   3
 #define PIT_CONTROL_PORT   0x43
 
+#define mil_seconds_per_intr (1000 / IRQ0_FREQUENCY)
+
 uint32_t ticks;          // ticks是内核自中断开启以来总共的嘀嗒数
 
 /* 把操作的计数器counter_no、读写锁属性rwl、计数器模式counter_mode写入模式控制寄存器并赋予初始值counter_value */

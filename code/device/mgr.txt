@@ -1,0 +1,393 @@
+/*******************************************************************************
+*  Copyright 2016 Microsemi Corporation. All rights reserved. Microsemi and the
+*  Microsemi logo are trademarks of Microsemi Corporation. All other trademarks
+*  and service marks are the property of their respective owners.
+* --------------------------------------------------------------------------
+*  This software embodies materials and concepts which are proprietary and
+*  confidential to Microsemi.
+*  Microsemi distributes this software to its customers pursuant to the
+*  terms and conditions of the Software License Agreement
+*  contained in the text file software.lic that is distributed along with
+*  the software. This software can only be utilized if all
+*  terms and conditions of the Software License Agreement are
+*  accepted. If there are any questions, concerns, or if the
+*  Software License Agreement text file, software.lic, is missing please
+*  contact Microsemi for assistance.
+* --------------------------------------------------------------------------
+*
+*   $RCSfile: portmgr.h.rca $
+*
+*   $Date$
+*
+*   $Revision$
+*
+*   DESCRIPTION :
+*     This file contains or includes all the definitions &
+*     declarations in the PORTMGR module that are required by external
+*     applications.
+*
+*   NOTES:
+*     None.
+*
+*******************************************************************************/
+
+#ifndef _PORTMGR_H
+#define _PORTMGR_H
+
+
+/*
+** Include Files
+*/
+#include "pmcfw_types.h"
+#include "osf.h"
+
+
+/*
+** Enumerated Types
+*/
+
+
+/*
+** Basic Type Redefinitions
+*/
+typedef void (*portmgr_conn_callback_fn_ptr)(UINT8 conn_id, UINT8 *flag_buf);
+
+
+/*
+** Constants
+*/
+/* PORTMGR specific message types */
+#define PORTMGR_MSGTYPE_BPP_POLL OSF_MSG_TYPE_CREATE(PMCFW_MID_PORTMGR, 0x0001)  /* BPP POLL timeout message */
+#define PORTMGR_MSGTYPE_CONN_INT OSF_MSG_TYPE_CREATE(PMCFW_MID_PORTMGR, 0x0002)  /* SAS connector interrupt message */
+
+/* seq id for portmgr smp msgs */
+#define PORTMGR_SMP_REQ_OFFSET                      (8)
+#define PORTMGR_SMP_REQ_TOPD_TYPE                   (0 << PORTMGR_SMP_REQ_OFFSET)
+#define PORTMGR_SMP_REQ_PING_TYPE                   (1 << PORTMGR_SMP_REQ_OFFSET)
+#define PORTMGR_SMP_REQ_ZONE_TYPE                   (2 << PORTMGR_SMP_REQ_OFFSET)
+#define PORTMGR_SMP_REQ_RF_SCAN_TYPE                (3 << PORTMGR_SMP_REQ_OFFSET)
+
+/* Used to setup OSF mailboxes */
+#define PORTMGR_THREAD_MBX_HIGHPRI_COUNT    1
+#define PORTMGR_NUMBUF                      1
+
+/* Used to send broadcast(expander) or (change) */
+#define PORTMGR_PRIM_BROADCAST_EXPANDER     0
+#define PORTMGR_PRIM_BROADCAST_CHANGE       1
+
+/***************************************************************************
+* MACRO: PORTMGR_ERR_CODE_CREATE
+* __________________________________________________________________________
+*
+* DESCRIPTION:
+* - This macro creates the PORTMGR error codes
+* - Each PORTMGR error code has 32 bits, is of type "PMCFW_ERROR".
+* - The format is as follows:
+*   [0 (4-bit) | PMCFW_ERR_BASE_PORTMGR (16-bit) | error code suffix (12-bit)]
+* - For success, the return code = PMC_SUCCESS.
+*
+* INPUTS:
+*   UINT16 err_suffix - 12-bit error suffix
+*
+* RETURNS:
+*   Watchdog error/return code.
+*
+****************************************************************************/
+#define PORTMGR_ERR_CODE_CREATE(err_suffix)     ((PMCFW_ERR_BASE_PORTMGR) | (err_suffix))
+
+#define PORTMGR_ERR_FAIL                        PORTMGR_ERR_CODE_CREATE(0x001)  /* Generic portmgr error code */
+#define PORTMGR_ERR_INVALID_MSG_RECV            PORTMGR_ERR_CODE_CREATE(0x002)  /* The OSF message received by the portmgr thread is invalid */
+#define PORTMGR_ERR_LIST_INVALID_ENTRY_INDEX    PORTMGR_ERR_CODE_CREATE(0x003)  /* An invalid entry index was used to access an element of the list. */
+#define PORTMGR_ERR_UNEXPECTED_SMP_RESPONSE     PORTMGR_ERR_CODE_CREATE(0x004)  /* An unexpected SMP response was rec'd */
+#define PORTMGR_ERR_UNEXPECTED_EXP_RT_TBL_CH_CNT    PORTMGR_ERR_CODE_CREATE(0x005)  /* An unexpected expander route table change coutn was rec'd */
+
+/*
+** Structures and Unions
+*/
+
+/******************************************************************************
+** STRUCT: portmgr_config_struct
+**  ___________________________________________________________________________
+**
+** DESCRIPTION: Configuration parameters required as input to the create()
+**              routine.  Once the create() routine has been called, these
+**              parameters can not be changed.
+**
+**  ELEMENTS:
+**    thread_priority   - in:  Priority of the PORTMGR thread
+**    stack_size        - in:  Size of the PORTMGR thread's stack
+******************************************************************************/
+typedef struct
+{
+    UINT16 thread_priority;
+    UINT16 stack_size;
+
+} portmgr_config_struct;
+
+/******************************************************************************
+** STRUCT: portmgr_parms_struct
+**  ___________________________________________________________________________
+**
+** DESCRIPTION: Structure for initialization of the portmgr module.
+**
+**  ELEMENTS:
+**    config            - in:  Config params for the create() routine
+**    portmgr_mbx_info  - out: Mailbox  of PORTMGR thread
+**    smpinit_mbx_info  - in:  Mailbox of SMPINIT thread
+**    dsq_mbx_info      - in: Mailbox of DSQ thread
+**
+******************************************************************************/
+typedef struct
+{
+    /* Required before call to portmgr_create() */
+    portmgr_config_struct config;
+
+    /* Returned from call to portmgr_create() */
+    osf_mq_info_struct portmgr_mbx_info;
+
+    /* Required before call to portmgr_init() */
+    osf_mq_info_struct smpinit_mbx_info;
+    osf_mq_info_struct dsq_mbx_info;
+
+} portmgr_parms_struct;
+
+/***************************************************************************
+* STRUCTURE: portmgr_timer_struct
+* __________________________________________________________________________
+*
+* DESCRIPTION:
+*   Structure used to contain information about the timer object.
+*
+* ELEMENTS:
+*   duration_ms      - timer duration in ms.
+*   start_time_ticks - timer start time in ticks.
+*   init_complete    - initialization complete.
+*
+****************************************************************************/
+typedef struct
+{
+    UINT32 duration_ms;
+    UINT32 start_time_ticks;
+    BOOL   init_complete;
+
+} portmgr_timer_struct;
+
+/******************************************************************************
+** STRUCT: portmgr_conn_parms_struct
+**  ___________________________________________________________________________
+**
+** DESCRIPTION: Structure for initialization of the portmgr module.
+**
+**  ELEMENTS:
+**    config            - in:  Config params for the create() routine
+**    portmgr_mbx_info  - out: Mailbox  of PORTMGR thread
+**    smpinit_mbx_info  - in:  Mailbox of SMPINIT thread
+**    dsq_mbx_info      - in: Mailbox of DSQ thread
+**
+******************************************************************************/
+typedef struct
+{
+    /* Required before call to portmgr_create() */
+    portmgr_config_struct config;
+
+    /* Returned from call to portmgr_create() */
+    osf_mq_info_struct portmgr_conn_mbx_info;
+
+} portmgr_conn_parms_struct;
+
+/***************************************************************************
+* STRUCTURE: portmgr_conn_msg_struct
+* __________________________________________________________________________
+*
+* DESCRIPTION:
+*   Structure defining SAS connector intrrupt message.
+*
+* ELEMENTS:
+*   hdr             - Standard message header
+*   sas_mod_stat    - SAS connector present status
+*   sas_mod_int     - SAS connector present intrrupt.
+*   sas_mod_not_int - SAS connector not present intrrupt.
+*   sas_con_int     - SAS connector event intrrupt.
+*   init_status     - orginate the initial status of connector.
+****************************************************************************/
+typedef struct 
+{
+    osf_msg_header_struct   hdr;
+    UINT32                  sas_mod_stat;
+    UINT32                  sas_mod_int;
+    UINT32                  sas_mod_not_int;
+    UINT32                  sas_con_int;
+    BOOL                    init_status;
+} portmgr_conn_msg_struct;
+
+/***************************************************************************
+* STRUCTURE: portmgr_conn_info_struct
+* __________________________________________________________________________
+*
+* DESCRIPTION:
+*   Structure used to contain information about the SAS connectors.
+*
+* ELEMENTS:
+*
+****************************************************************************/
+typedef struct
+{
+    /* SAS connectot is manageable or not set by initstring  */
+    BOOL   cable_mgmnt;
+
+    /* cable is present or not for manageable SAS connectot */
+    UINT8  mgmnt_present;
+
+    /* cable is active or not for manageable SAS connectot */
+    UINT8  active_cable;
+
+    /* basic information from cable seeprom */
+    UINT8  ident;
+    UINT8  ext_ident;
+    UINT8  conn_type;
+    UINT8  sas_sata_compl;
+    UINT8  trans_tech;
+    UINT8  dev_tech;
+    UINT8  max_temp;
+    UINT32 length;
+    UINT8  vend_name[17];
+    UINT8  vend_part_num[17];
+    UINT8  vend_rev[3];
+} portmgr_conn_info_struct;
+
+
+/***************************************************************************
+* STRUCTURE: portmgr_dsq_struct
+* __________________________________________________________________________
+*
+* DESCRIPTION:
+*   Structure used to contain information about the portmgr dsq object.
+*
+* ELEMENTS:
+*   msg_rx_int  - Firmware interrupt indicating if a message has been received
+*                 or not. This interrupt is set my the rx_msg handler and
+*                 cleared on read by the portmgr dsq object.
+*   req_pending - Indicates whether or not a disk qualification request is
+*                 pending. The object is either already waiting for a response
+*                 from DSQ or has to wait for the timer to expire. This bit is
+*                 used to prevent the object from sending more than one message
+*                 at a time to DSQ.
+*   msg_pending - Indicates whether or not a message has been sent and if the
+*                 object is awaiting a response.
+*   timer       - Timer object used to block against flooding the DSQ thread
+*                 with messages.
+*   result      - This is the result from DSQ. It is only valid when msg_rx_int
+*                 is TRUE. If result = TRUE Disk Qualification has passed.
+*
+****************************************************************************/
+typedef struct
+{
+    BOOL                    msg_rx_int;
+    BOOL                    req_pending;
+    BOOL                    msg_pending;
+    portmgr_timer_struct    timer;
+    portmgr_timer_struct    req_delay_timer;
+    BOOL                    result;
+
+} portmgr_dsq_struct;
+
+/***************************************************************************
+* STRUCTURE: ndsr_portmgr_phy_state_struct_save
+* __________________________________________________________________________
+*
+* DESCRIPTION:
+*   Structure used to contain information about the portmgr dsq object.
+*
+* ELEMENTS:
+*
+*
+****************************************************************************/
+typedef struct
+{
+    portmgr_dsq_struct          dsq;
+} ndsr_portmgr_phy_state_struct_save;
+
+typedef void (*portmgr_phy_warning_notify_ftn_ptr)(void   *callback_data, 
+                                                   UINT32 log_phy_id, 
+                                                   BOOL   loop_detected,
+                                                   BOOL   illegal_phy);
+/*
+** Global Variables
+*/
+/* Used for debug only */
+EXTERN  UINT8   portmgr_display_logrt_tbl;
+
+/*
+** Function Prototypes
+*/
+EXTERN portmgr_parms_struct* portmgr_parms_get(osf_sys_cfg_struct *osf_cfg_ptr);
+EXTERN void portmgr_create(portmgr_parms_struct *parms_ptr);
+EXTERN void portmgr_init(portmgr_parms_struct *parms_ptr);
+EXTERN void portmgr_osf_tmr_expiration(UINT32 val);
+EXTERN void portmgr_spinup_spin_state_overwrite(const PHYMAP_TYPE spinning_drv_mask);
+EXTERN void portmgr_sps_monitor_enable(UINT8 log_phy_id);
+EXTERN void portmgr_sps_monitor_disable(UINT8 log_phy_id);
+EXTERN void portmgr_bpp_orig_suppress_set(UINT8 log_phy_id);
+EXTERN void portmgr_bpp_orig_suppress_clear(UINT8 log_phy_id);
+EXTERN BOOL portmgr_spinup_phy_spinup_hold_status_get(UINT8 log_phy_id);
+EXTERN void portmgr_spinup_phy_spinup_hold_status_set(UINT8 log_phy_id, BOOL status);
+
+EXTERN portmgr_conn_parms_struct* portmgr_conn_parms_get(osf_sys_cfg_struct *osf_cfg_ptr);
+EXTERN void portmgr_conn_create(portmgr_conn_parms_struct *parms_ptr);
+EXTERN void portmgr_conn_init(portmgr_conn_callback_fn_ptr fn_callback);
+EXTERN void portmgr_conn_phy_init(UINT32 *vman_map, UINT32 *vact_map);
+EXTERN void portmgr_conn_turn_vact(UINT8 sas_conn_id, BOOL turn_on);
+EXTERN void portmgr_conn_turn_vman(UINT8 sas_conn_id, BOOL turn_on);
+EXTERN void portmgr_conn_turn_pwr(UINT32 vman_map, UINT32 vact_map);
+EXTERN void portmgr_conn_cable_monitor_get(UINT8 sas_conn_id, UINT8 *data_buf);
+EXTERN void portmgr_conn_tx_disable(UINT8 sas_conn_id, UINT8 tx_id, BOOL disable);
+EXTERN void portmgr_conn_rate_select(UINT8 sas_conn_id,
+                                     UINT8 rx_tx,
+                                     UINT8 rx_tx_id,
+                                     UINT8 rate_sel);
+EXTERN void portmgr_conn_appl_select(UINT8 sas_conn_id,
+                                     UINT8 rx_tx,
+                                     UINT8 rx_tx_id,
+                                     UINT8 appl_sel);
+EXTERN void portmgr_conn_power_set(UINT8 sas_conn_id,
+                                   BOOL  low_power,
+                                   BOOL  power_override);
+EXTERN void portmgr_conn_cable_remove_proc(UINT8 sas_conn_id);
+EXTERN void portmgr_conn_cable_insert_proc(UINT8 sas_conn_id);
+EXTERN void portmgr_conn_send_stat(void);
+
+EXTERN BOOL portmgr_exp_phy_rdy_proc_done_get(UINT8 log_phy_id);
+EXTERN void portmgr_exp_phy_rdy_proc_done_clr(UINT8 log_phy_id);
+EXTERN BOOL portmgr_att_illegal_exp_phy_get(UINT8 log_phy_id);
+EXTERN void portmgr_topd_illegal_exp_phy_set(UINT8 log_phy_id);
+EXTERN void portmgr_sgpio_phy_rdy_map_clr(void);
+EXTERN void portmgr_topd_loop_wide_port_set(UINT8 log_phy_id);
+EXTERN BOOL portmgr_topd_illegal_wide_port_get(UINT8 log_phy_id);
+EXTERN BOOL portmgr_topd_illegal_exp_phy_get(UINT8 log_phy_id);
+EXTERN void portmgr_topd_illegal_exp_phy_clr(UINT8 log_phy_id);
+EXTERN void portmgr_topd_illegal_exp_wide_port_clr(UINT8 log_phy_id);
+EXTERN void portmgr_topd_loop_found_set(BOOL loop_found);
+EXTERN BOOL portmgr_topd_loop_found_get(void);
+
+
+EXTERN BOOL portmgr_timer_init(portmgr_timer_struct *timer_ptr,
+                               UINT32               duration_ms);
+
+EXTERN BOOL portmgr_timer_start(portmgr_timer_struct *timer_ptr);
+
+EXTERN BOOL portmgr_timer_is_expired(portmgr_timer_struct *timer_ptr);
+
+EXTERN UINT32 portmgr_timer_remaining_ms_get(portmgr_timer_struct *timer_ptr);
+
+EXTERN void portmgr_rf_post_ndsr_proc(void        *state_info_ptr,
+                                      PHYMAP_TYPE portmgr_topd_inprogress);
+
+EXTERN void portmgr_prim_rf_set(void               *state_info_ptr, 
+                                UINT8              type);
+
+EXTERN BOOL portmgr_ndsr_save(void);
+
+EXTERN UINT8 portmgr_spinup_group_count_get(void);
+
+#endif /* _PORTMGR_H */
+

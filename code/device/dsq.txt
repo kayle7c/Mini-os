@@ -1,0 +1,430 @@
+/*******************************************************************************
+*  Copyright 2016 Microsemi Corporation. All rights reserved. Microsemi and the
+*  Microsemi logo are trademarks of Microsemi Corporation. All other trademarks
+*  and service marks are the property of their respective owners.
+* --------------------------------------------------------------------------
+*  This software embodies materials and concepts which are proprietary and
+*  confidential to Microsemi.
+*  Microsemi distributes this software to its customers pursuant to the
+*  terms and conditions of the Software License Agreement
+*  contained in the text file software.lic that is distributed along with
+*  the software. This software can only be utilized if all
+*  terms and conditions of the Software License Agreement are
+*  accepted. If there are any questions, concerns, or if the
+*  Software License Agreement text file, software.lic, is missing please
+*  contact Microsemi for assistance.
+* --------------------------------------------------------------------------
+*
+*   $RCSfile: portmgr_dsq.c.rca $
+*
+*   $Date$
+*
+*   $Revision$
+*
+*   DESCRIPTION :
+*     This file contains routines to support the Portmgr Disk Qualification
+*     functionality. The control flow for DSQ is implemented within portmgr.c.
+*     The portmgr_dsq object is implemented in this file. This object is
+*     responsible for starting disk qualification by sending a message to the
+*     DSQ thread and to handle the possible events and message responses. There
+*     is one DSQ object per phy and these objects are stored within the portmgr
+*     struct. The methods defined in this file operate on single objects
+*     independently.
+*
+*   NOTES:
+*     None.
+*
+*******************************************************************************/
+
+
+/*
+** Include Files
+*/
+#include "portmgr_loc.h"
+
+
+/*
+** Local Constants and Enumerated Types
+*/
+
+
+/*
+** Local Structures and Unions
+*/
+
+
+/*
+** Local Variables
+*/
+
+
+/*
+** Public Functions
+*/
+
+/*******************************************************************************
+*
+* FUNCTION: portmgr_dsq_init
+* ______________________________________________________________________________
+*
+* DESCRIPTION:
+*   Initialize the portmgr_dsq object. Sets everything to FALSE and starts the
+*   timer with a duration of min_time_ms. This function clears the msg_pending
+*   flag - therefore it should not be called during run-time.
+*
+* INPUTS:
+*   dsq_ptr     - (pointer to) portmgr dsq object.
+*   min_time_ms - Minimum time between requests to the DSQ thread per phy.
+*
+* OUTPUTS:
+*   None.
+*
+* RETURNS:
+*   Void.
+*
+*******************************************************************************/
+PUBLIC void portmgr_dsq_init(portmgr_dsq_struct *dsq_ptr,
+                                UINT32 min_time_ms,
+                                UINT32 delay_min_ms)
+{
+
+    dsq_ptr->msg_pending = FALSE;
+    dsq_ptr->msg_rx_int  = FALSE;
+    dsq_ptr->req_pending = FALSE;
+
+    portmgr_timer_init(&dsq_ptr->req_delay_timer, delay_min_ms);
+    portmgr_timer_init(&dsq_ptr->timer,
+                       min_time_ms);
+
+    portmgr_timer_start(&dsq_ptr->timer);
+
+} /* portmgr_dsq_init() */
+
+
+/*******************************************************************************
+*
+* FUNCTION: portmgr_dsq_clear
+* ______________________________________________________________________________
+*
+* DESCRIPTION:
+*   Clears pending requests from the portmgr_dsq object.
+*
+* INPUTS:
+*   dsq_ptr     - (pointer to) portmgr dsq object.
+*   log_phy_id  - Phy id to clear DSQ on.
+*
+* OUTPUTS:
+*   None.
+*
+* RETURNS:
+*   Void.
+*
+*******************************************************************************/
+PUBLIC void portmgr_dsq_clear(portmgr_dsq_struct *dsq_ptr,
+                              UINT8              log_phy_id)
+{
+
+    dsq_ptr->msg_rx_int  = FALSE;
+    dsq_ptr->req_pending = FALSE;
+    dsq_ptr->result      = FALSE;
+
+} /* portmgr_dsq_clear() */
+
+/*******************************************************************************
+**
+**  FUNCTION: portmgr_dsq_req_msg_osf_hdr_format
+**  ___________________________________________________________________________
+**
+**  DESCRIPTION:    Assigns some fields to the message header
+**
+**  INPUTS:         msg_hdr_ptr - (pointer to) the message header.
+**
+**  OUTPUTS:        None.
+**
+**  RETURNS:        void
+**
+*******************************************************************************/
+PRIVATE void portmgr_dsq_req_msg_osf_hdr_format(osf_msg_header_struct *msg_hdr_ptr)
+{
+    msg_hdr_ptr->msg_type   = DSQ_MSG_DISK_QUALIFY_REQ;
+    msg_hdr_ptr->recipient  = dsq_mbx_info;
+    msg_hdr_ptr->sender     = portmgr_mbx_info;
+
+} /* portmgr_dsq_req_msg_osf_hdr_format() */
+
+
+/*******************************************************************************
+*
+* FUNCTION: portmgr_dsq_req_msg_send
+* ______________________________________________________________________________
+*
+* DESCRIPTION:
+*   Sends a request message to the DSQ thread.
+*
+* INPUTS:
+*   disk_type  - SATA or SAS.
+*   log_phy_id - Logical phy id to qualify.
+*   sas_addr   - The sas address of the attached device.
+*
+* OUTPUTS:
+*   None.
+*
+* RETURNS:
+*   Void.
+*
+*******************************************************************************/
+PUBLIC void portmgr_dsq_req_msg_send(UINT8  disk_type,
+                                     UINT8  log_phy_id,
+                                     UINT64 sas_addr)
+{
+    PMCFW_ERROR                 err;
+    dsq_qualify_req_msg_struct  *msg_ptr;
+
+    err = osf_mem_pool_alloc(portmgr_dsq_pool_hndl,
+                             sizeof(dsq_qualify_req_msg_struct),
+                             (void **)&msg_ptr,
+                             OSF_WAIT_NONE);
+
+    PMCFW_ASSERT(err == PMC_SUCCESS, err);
+
+    /* format the header */
+    portmgr_dsq_req_msg_osf_hdr_format(&(msg_ptr->hdr));
+
+    /* set the SAS address */
+    msg_ptr->disk_type  = (DSQ_DISK_TYPE_ENUM)disk_type;
+    msg_ptr->log_phy_id = log_phy_id;
+    msg_ptr->sas_addr   = sas_addr;
+
+    err = osf_msg_send((void **)&msg_ptr, OSF_WAIT_FOREVER);
+
+    PMCFW_ASSERT(err == PMC_SUCCESS, err);
+
+} /* portmgr_dsq_req_msg_send() */
+
+/*******************************************************************************
+*
+* FUNCTION: portmgr_dsq_proc
+* ______________________________________________________________________________
+*
+* DESCRIPTION:
+*   The main processing method for the dsq object. This method is responsible
+*   for sending DSQ requests to the DSQ thread, sending broadcast changes if 
+*   DSQ was a success and clearing the msg_rx_int bit. 
+*
+*   This function should be
+*   called when a sas drive goes phy ready or a sata drive sends an initial FIS
+*   If there is no response message pending from the DSQ thread a new request 
+*   message will be sent, otherwise the request pending status is not cleared
+*   and in the next poll period we will try to send the message again. In this 
+*   case the pending response message will be ignored.
+*
+*   If a response message has been received in the last poll period and no
+*   new pending request exists then the message result is serviced by calling
+*   portmgr_state_phy_rdy_qual_proc(). If the phy has gone down in the time 
+*   since the DSQ response was received then DSQ is cleared for this phy and 
+*   no broadcast changes will be sent. 
+*    
+*
+* INPUTS:
+*   state_info_ptr - (pointer to) the portmgr state structure.
+*
+* OUTPUTS:
+*   None.
+*
+* RETURNS:
+*   Void.
+*
+*******************************************************************************/
+PUBLIC void portmgr_dsq_proc(portmgr_state_struct *state_info_ptr)
+{
+    portmgr_dsq_struct          *dsq_ptr;
+    portmgr_phy_state_struct    *phy_state_info_ptr;
+    UINT8                       disk_type;
+    UINT64                      sas_addr;
+    PMCFW_ERROR                 err;
+
+    phy_state_info_ptr =
+        &(state_info_ptr->phy_state_info_ptr[state_info_ptr->curr_log_phy_id]);
+
+    dsq_ptr = &(phy_state_info_ptr->dsq);
+
+    /*
+    ** Check if there is a request pending on this phy. If there is,
+    ** it could be due to a phy coming up, or a received message that
+    ** needs to be processed.
+    */
+    if ((dsq_ptr->req_pending) && portmgr_timer_is_expired(&dsq_ptr->req_delay_timer))
+    {
+        /*
+        ** If there is no pending message and the timer has expired
+        ** restart the timer and submit a new DSQ request.
+        */
+        if (!dsq_ptr->msg_pending &&
+            portmgr_timer_is_expired(&dsq_ptr->timer))
+        {
+            dsq_ptr->msg_pending = TRUE;
+            dsq_ptr->req_pending = FALSE;
+            portmgr_timer_start(&dsq_ptr->timer);
+
+            if (phy_state_info_ptr->sas_att)
+            {
+                disk_type = DSQ_DISK_TYPE_SCSI;
+            }
+            else
+            {
+                disk_type = DSQ_DISK_TYPE_SATA;
+            }
+
+            /* Ignore response from ecmr as dsq will kill it anyways */
+            err = ecmr_att_sas_addr_get(state_info_ptr->curr_log_phy_id,
+                                        &sas_addr);
+
+            if (err != PMC_SUCCESS) 
+            {
+                /* Response from ECMR cannot be trusted, set address to 0 */
+                sas_addr = 0;
+            }
+
+            portmgr_dsq_req_msg_send(disk_type,
+                                     state_info_ptr->curr_log_phy_id,
+                                     sas_addr);
+        }
+    }
+    else if (dsq_ptr->msg_rx_int &&
+             dsq_ptr->result)
+    {
+        /*
+        ** The DSQ response message has been received and the
+        ** qualification was successful.
+        */
+        if (sxl_init_passed_get(state_info_ptr->curr_log_phy_id))
+        {
+            /* Send a broadcast since the phy is still ready */
+            portmgr_state_phy_rdy_qual_proc(state_info_ptr);
+        }
+        else
+        {
+            /* 
+            ** If the DSQ response came back but the phy has gone down 
+            ** clear DSQ to prepare for the next event on this phy. 
+            */
+            portmgr_dsq_clear(dsq_ptr,
+                              state_info_ptr->curr_log_phy_id);
+        }
+    }
+
+
+    /* 
+    ** Since we have serviced the result, it is not longer valid, 
+    ** clear msg_rx_int. 
+    */
+    dsq_ptr->msg_rx_int = FALSE;
+
+} /* portmgr_dsq_proc() */
+
+
+/*******************************************************************************
+*
+* FUNCTION: portmgr_dsq_rsp_msg_proc
+* ______________________________________________________________________________
+*
+* DESCRIPTION:
+*   This method handles the response message from the DSQ thread. The caller is
+*   responsible for passing the correct portmgr_dsq object to this function
+*   along with the message.
+*
+* INPUTS:
+*   state_info_ptr - (pointer to) portmgr state information.
+*   rsp_msg_ptr    - (pointer to) the response message from the DSQ thread.
+*
+* OUTPUTS:
+*   None.
+*
+* RETURNS:
+*   Void.
+*
+*******************************************************************************/
+PUBLIC void portmgr_dsq_rsp_msg_proc(portmgr_state_struct       *state_info_ptr,
+                                     dsq_qualify_rsp_msg_struct *rsp_msg_ptr)
+{
+    portmgr_dsq_struct *dsq_ptr;
+
+    /* Need to figure out which phy this message belongs to */
+    dsq_ptr =
+        &(state_info_ptr->phy_state_info_ptr[rsp_msg_ptr->log_phy_id].dsq);
+
+    /* Save the result */
+    dsq_ptr->result = rsp_msg_ptr->result;
+
+    /* We can now send another message to DSQ if the timer is also expired */
+    dsq_ptr->msg_pending = FALSE;
+
+    /* Signal to the polling loop that it is time to service this response. */
+    dsq_ptr->msg_rx_int = TRUE;
+
+    /* Free the response message */
+    osf_mem_pool_free((void **)&rsp_msg_ptr);
+
+} /* portmgr_dsq_rsp_msg_proc() */
+
+
+/*******************************************************************************
+*
+* FUNCTION: portmgr_dsq_is_proc_reqd
+* ______________________________________________________________________________
+*
+* DESCRIPTION:
+*   Determines if dsq processing is required this poll period.
+*
+* INPUTS:
+*   dsq_ptr     - (pointer to) portmgr dsq object.
+*
+* OUTPUTS:
+*   None.
+*
+* RETURNS:
+*   TRUE  - Processing required.
+*   FALSE - Precessing not required.
+*
+*******************************************************************************/
+PUBLIC BOOL portmgr_dsq_is_proc_reqd(portmgr_dsq_struct *dsq_ptr)
+{
+    if (dsq_ptr->msg_rx_int ||
+        dsq_ptr->req_pending)
+    {
+        return TRUE;
+    }
+    return FALSE;
+
+} /* portmgr_dsq_is_proc_reqd() */
+
+/*******************************************************************************
+*
+* FUNCTION: portmgr_dsq_request
+* ______________________________________________________________________________
+*
+* DESCRIPTION:
+*   Sets the request pending bit and clears the DSQ bit in SMP.
+*
+* INPUTS:
+*   dsq_ptr     - (pointer to) portmgr dsq object.
+*   log_phy_id  - phy id to request DSQ on.
+*
+* OUTPUTS:
+*   None.
+*
+* RETURNS:
+*   void.
+*
+*******************************************************************************/
+PUBLIC void portmgr_dsq_request(portmgr_dsq_struct *dsq_ptr,
+                                UINT8              log_phy_id)
+{
+    dsq_ptr->req_pending = TRUE;
+
+    /* Start the delay timer, when expires, the request will be allowed to send */
+    portmgr_timer_start(&dsq_ptr->req_delay_timer);
+} /* portmgr_dsq_request() */
+
+
+
